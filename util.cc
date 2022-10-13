@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include "util.h"
-#include <string>
-
+#include <string.h>
+#include <typeinfo>
+#include <fstream>
+#include <sstream>
 
 void get_input(int argc, char *argv[], struct Param* parameters) {
 	printf("\nReceive the Input!\n\n");
@@ -21,9 +23,33 @@ void get_input(int argc, char *argv[], struct Param* parameters) {
 		else if (i == 6)
             parameters->trace_file = string(argv[6]);
 	}
+
 	printf("\n");
 
     return;
+}
+
+
+void parse_trace(struct Param* parameters) {
+	string path = "../traces/";
+	//cout << typeid(path).name() <<endl;
+	//cout << typeid(parameters->trace_file).name() << endl;
+	string file = path + parameters->trace_file;
+	//cout << typeid(file).name() << endl;
+    fstream f(file.c_str());
+
+    string line;
+	while(getline(f, line)) {
+        char r_w;
+        unsigned address; 
+
+		istringstream separate(line);
+		separate >> r_w;
+		separate >> hex >> address; // convert hex address to dec
+		// cout << r_w << " " << address << endl;
+
+	}
+	f.close();
 }
 
 
@@ -38,10 +64,22 @@ void give_output(struct Param* parameters) {
     cout << "  ===================================\n\n";
 
     cout << "===== L1 contents =====\n";
-	
+
     cout << "\n\n  ==== Simulation results (performance) ====\n";
     cout << "  1. average access time:" ;
 	
 	cout << "\n\n  ==== Simulation results (performance) ====\n";
     cout << "  1. average access time:" << setw(15) << " \n";
+}
+
+
+
+
+/* For class Cache functions */
+bool Cache::readFromAddress(unsigned int add) {
+
+}
+
+bool Cache::writeToAddress(unsigned int add) {
+
 }

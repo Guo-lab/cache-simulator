@@ -20,6 +20,16 @@ argument #5 = 1
 argument #6 = gcc_trace.txt
 ```
 
-# Do it  
 
+# Do it  
+- [parameters](https://www.runoob.com/w3cnote/c-the-structure-of-the-parameter.html)
+
+Problems:
+- parts of address missed, 
+```
+r 40051
+r 40051
+r 40048248
+```
+  - Reason: `unsigned address;`, [Solved]: convert from hex to dec.
 

@@ -7,5 +7,6 @@ int main(int argc, char *argv[]) {
     get_input(argc, argv, &parameters);
 	//cout << parameters.L1_ASSOC << "\n";
 
+    parse_trace(&parameters);
     give_output(&parameters);
 }
