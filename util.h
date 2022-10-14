@@ -31,13 +31,26 @@ class Cache {
             tag 部分；
             各种计数器变量；
         */
-        // 指向下一级Cache 的指针
-        //CACHE *nextLevel;
+        int cachesize, assoc, blocksize, replace, write, setnum, cachelevel;
+        string trace_file;
+        int totalReads, missReads;
+        int totalWrites, missWrites, writeBacks;
+        //CACHE *nextLevel; // 指向下一级Cache 的指针
+
+        // https://blog.csdn.net/Zhangsama1/article/details/123693862
+        typedef struct {
+            bool valid_bit;
+            unsigned int tag, stamp;
+        } Block;
+        Block **cache_sets;
     
     public:
+        Cache(int _cachesize, int _assoc, int _blocksize, int _replace, int _write, string _trace_file);
+        ~Cache();
+
         // Cache 类的成员函数
-        bool readFromAddress(unsigned int add);
-        bool writeToAddress(unsigned int add);
+        bool readFromAddress(unsigned int index, unsigned int tag);
+        bool writeToAddress(unsigned int index, unsigned int tag);
         // Cache 其他功能函数
 };
 

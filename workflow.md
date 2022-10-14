@@ -28,8 +28,14 @@ Problems:
 - parts of address missed, 
 ```
 r 40051
-r 40051
+r 40051![image-20221014171229251](image-20221014171229251.png)
 r 40048248
 ```
   - Reason: `unsigned address;`, [Solved]: convert from hex to dec.
+
+
+
+- ![image-20221014171229251](./md-img/image-20221014171229251.png)  
+
+- ![image-20221014201140750](./md-img/image-20221014201140750.png)
 

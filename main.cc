@@ -8,5 +8,6 @@ int main(int argc, char *argv[]) {
 	//cout << parameters.L1_ASSOC << "\n";
 
     parse_trace(&parameters);
-    give_output(&parameters);
+
+    //give_output(&parameters);
 }
