@@ -21,7 +21,7 @@ struct Param {
 
 void get_input(int argc, char *argv[], struct Param* parameters);
 void parse_trace(struct Param* parameters);
-void give_output(struct Param* parameters);
+void give_output(struct Param* parameters, int totalReads, int totalWrites, int missReads, int missWrites, int writeBacks);
 
 
 class Cache {
@@ -33,18 +33,22 @@ class Cache {
         */
         int cachesize, assoc, blocksize, replace, write, setnum, cachelevel;
         string trace_file;
-        int totalReads, missReads;
-        int totalWrites, missWrites, writeBacks;
+
         //CACHE *nextLevel; // 指向下一级Cache 的指针
 
         // https://blog.csdn.net/Zhangsama1/article/details/123693862
         typedef struct {
-            bool valid_bit;
-            unsigned int tag, stamp;
+            bool valid_bit, dirty_bit;
+            unsigned int tag, COUNT_BLOCK;
         } Block;
         Block **cache_sets;
+
+        unsigned int *COUNT_SET;        
     
     public:
+        int totalReads, missReads;
+        int totalWrites, missWrites, writeBacks;
+
         Cache(int _cachesize, int _assoc, int _blocksize, int _replace, int _write, string _trace_file);
         ~Cache();
 
@@ -52,6 +56,7 @@ class Cache {
         bool readFromAddress(unsigned int index, unsigned int tag);
         bool writeToAddress(unsigned int index, unsigned int tag);
         // Cache 其他功能函数
+        void replace_block(unsigned int index, unsigned int tag, bool IsW);
 };
 
 

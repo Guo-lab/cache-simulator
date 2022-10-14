@@ -68,17 +68,27 @@ void parse_trace(struct Param* parameters) {
 		
 		if (r_w == 'r') {
 			result = CacheL1.readFromAddress(index, tag);
-
+            if (!result) 
+			    CacheL1.replace_block(index, tag, false);
 		}
 		else if (r_w == 'w') {
 			result = CacheL1.writeToAddress(index, tag);
 		}
 	}
 	f.close();
+
+	// When I try to give_output(struct Param* parameters, class Cache CacheL1);
+	// Got free(): double free detected in tcache 2
+    //     Aborted (core dumped)
+	give_output(parameters, CacheL1.totalReads, \ 
+	    CacheL1.totalWrites, \
+		CacheL1.missReads, \
+		CacheL1.missWrites, \
+		CacheL1.writeBacks);
 }
 
 
-void give_output(struct Param* parameters) {
+void give_output(struct Param* parameters, int totalReads, int totalWrites, int missReads, int missWrites, int writeBacks) {
 	cout << "  ===== Simulator configuration =====\n";
     cout << "  L1_BLOCKSIZE:" << setw(22) << parameters->L1_BLOCKSIZE << endl;
     cout << "  L1_SIZE:" << setw(27) << parameters->L1_SIZE << endl;
@@ -90,8 +100,11 @@ void give_output(struct Param* parameters) {
 
     cout << "===== L1 contents =====\n";
 
-    cout << "\n\n  ==== Simulation results (performance) ====\n";
-    cout << "  1. average access time:" ;
+    cout << "\n  ====== Simulation results (raw) ======\n";
+    cout << "  a. number of L1 reads:" << setw(16) << totalReads << endl;
+	cout << "  b. number of L1 read misses:" << setw(10) << missReads << endl;
+	cout << "  c. number of L1 writes:" << setw(15) << totalWrites << endl;
+    cout << "  d. number of L1 write misses:" << setw(9) << missWrites << endl;
 	
 	cout << "\n\n  ==== Simulation results (performance) ====\n";
     cout << "  1. average access time:" << setw(15) << " \n";
@@ -132,11 +145,15 @@ Cache::Cache(int _cachesize, int _assoc, int _blocksize, int _replace, int _writ
 		cache_sets[i] = (Block*)malloc(sizeof(Block) * assoc);
 		for (int j = 0; j < assoc; ++j) {
 			cache_sets[i][j].valid_bit = 0;
+			cache_sets[i][j].dirty_bit = 0;
 			cache_sets[i][j].tag = -1;
-			cache_sets[i][j].stamp = -1;
+			cache_sets[i][j].COUNT_BLOCK = 0;
 		}
 	}
-
+    COUNT_SET = (unsigned int*)malloc(sizeof(unsigned int) * setnum);
+	for (int i=0; i < setnum; ++i) {
+		COUNT_SET[i] = 0;
+	}
 	//cout << "Create an object for Cache" << endl;
 }
 Cache::~Cache(void) {
@@ -145,25 +162,70 @@ Cache::~Cache(void) {
 	    free(cache_sets[i]);
 	}
 	free(cache_sets);
+	free(COUNT_SET);
 }
 
 
 
 
-// (tag, index)
 bool Cache::readFromAddress(unsigned int index, unsigned int tag) {
     totalReads++;
 	// max index = 256
     for ( int i=0; i < assoc; i++) {
         // valid and tag exists
 		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag==tag) {
+			// time (5) LFU Least Frequently Used
+			// Update ages
+			cache_sets[index][i].COUNT_BLOCK = (replace? cache_sets[index][i].COUNT_BLOCK+1 : 0);
 			return true;
 		}
-		// No before
-		return false;
 	}
+    // time (0)
+	// No before
+	missReads++;
+	return false;
+}
+
+void Cache::replace_block(unsigned int index, unsigned int tag, bool IsW) {
+    // time (1)
+	int i;
+	for ( i=0; i < assoc; i++) {
+		if (cache_sets[index][i].valid_bit == 0) {
+			// fetch one to replace
+			break;
+		}
+	}
+	// time (4) full, replace one
+    if ( i == assoc ) {
+		// LFU
+		if (replace) {
+			unsigned int min_age = 10000;
+			//cout << min_age <<endl;
+			for (int k=0; k < assoc; k++) {
+				if (cache_sets[index][k].COUNT_BLOCK < min_age) {
+					i = k;
+					min_age = cache_sets[index][i].COUNT_BLOCK;
+				}
+			}
+		}
+	}
+
+	// time (2) read miss get one to place 
+	// with LFU, update stamp
+	if (cache_sets[index][i].valid_bit && replace) {
+        COUNT_SET[index] = cache_sets[index][i].COUNT_BLOCK;
+	}
+
+	// time (3) Update NO matter whether replace
+    cache_sets[index][i].COUNT_BLOCK = (replace ? COUNT_SET[index]+1 : 0);
+	cache_sets[index][i].tag         = tag;
+	cache_sets[index][i].dirty_bit   = IsW; 
+	cache_sets[index][i].valid_bit   = true;
 }
 
 bool Cache::writeToAddress(unsigned int index, unsigned int tag) {
     totalWrites++;
+
+	missWrites++;
+	return false;
 }
