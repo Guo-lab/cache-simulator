@@ -73,6 +73,13 @@ void parse_trace(struct Param* parameters) {
 		}
 		else if (r_w == 'w') {
 			result = CacheL1.writeToAddress(index, tag);
+		    // time (9) WTNA no replace no dirty_bit
+			if (!result) {
+				if (parameters->L1_WRITE_POLICY)
+				    continue;
+				else if (!parameters->L1_WRITE_POLICY)
+				    CacheL1.replace_block(index, tag, true);
+			}
 		}
 	}
 	f.close();
@@ -180,8 +187,7 @@ bool Cache::readFromAddress(unsigned int index, unsigned int tag) {
 			return true;
 		}
 	}
-    // time (0)
-	// No before
+    // time (0) No before
 	missReads++;
 	return false;
 }
@@ -209,6 +215,11 @@ void Cache::replace_block(unsigned int index, unsigned int tag, bool IsW) {
 			}
 		}
 	}
+    
+	// time (10) WBWA has been write, dirty
+    if (cache_sets[index][i].valid_bit && cache_sets[index][i].dirty_bit) {
+		writeBacks++;
+	}
 
 	// time (2) read miss get one to place 
 	// with LFU, update stamp
@@ -225,7 +236,16 @@ void Cache::replace_block(unsigned int index, unsigned int tag, bool IsW) {
 
 bool Cache::writeToAddress(unsigned int index, unsigned int tag) {
     totalWrites++;
-
+    // time (6)
+    for (int i=0; i < assoc; i++) {
+		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag==tag) {
+		    // time (7) LFU
+		    cache_sets[index][i].COUNT_BLOCK = (replace? cache_sets[index][i].COUNT_BLOCK+1 : 0);
+		    cache_sets[index][i].dirty_bit   = cache_sets[index][i].dirty_bit | (!write); 
+		    return true;
+		}
+	}
+	// time (8)
 	missWrites++;
 	return false;
 }
