@@ -1,5 +1,5 @@
-#ifndef _UTIL_H_
-#define _UTIL_H_
+#ifndef _CACHE_H_
+#define _CACHE_H_
 
 #include "stdlib.h"
 #include "stdio.h"
@@ -64,4 +64,4 @@ class Cache {
 };
 
 
-#endif // _UTIL_H
+#endif // _CACHE_H
