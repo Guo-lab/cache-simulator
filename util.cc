@@ -91,11 +91,11 @@ void parse_trace(struct Param* parameters) {
 	    CacheL1.totalWrites, \
 		CacheL1.missReads, \
 		CacheL1.missWrites, \
-		CacheL1.writeBacks);
+		CacheL1.writeBacks, CacheL1.cache_sets);
 }
 
 
-void give_output(struct Param* parameters, int totalReads, int totalWrites, int missReads, int missWrites, int writeBacks) {
+void give_output(struct Param* parameters, int totalReads, int totalWrites, int missReads, int missWrites, int writeBacks, Block** cache_sets) {
 	cout << "  ===== Simulator configuration =====\n";
     cout << "  L1_BLOCKSIZE:" << setw(22) << parameters->L1_BLOCKSIZE << endl;
     cout << "  L1_SIZE:" << setw(27) << parameters->L1_SIZE << endl;
@@ -106,15 +106,35 @@ void give_output(struct Param* parameters, int totalReads, int totalWrites, int 
     cout << "  ===================================\n\n";
 
     cout << "===== L1 contents =====\n";
+	for(int point = 0; point < parameters->L1_SIZE / (parameters->L1_BLOCKSIZE * parameters->L1_ASSOC); point++) {
+        cout << "set" << setw(4) << point << ":";
+        for(int inPoint = 0; inPoint < parameters->L1_ASSOC; inPoint++) {
+            cout << hex << setw(8) << cache_sets[point][inPoint].tag << ' ' << ((!parameters->L1_WRITE_POLICY && cache_sets[point][inPoint].dirty_bit) ? 'D' : ' ');
+		}
+		cout << endl << dec; // later, result dec count
+    }
 
     cout << "\n  ====== Simulation results (raw) ======\n";
     cout << "  a. number of L1 reads:" << setw(16) << totalReads << endl;
 	cout << "  b. number of L1 read misses:" << setw(10) << missReads << endl;
 	cout << "  c. number of L1 writes:" << setw(15) << totalWrites << endl;
     cout << "  d. number of L1 write misses:" << setw(9) << missWrites << endl;
-	
-	cout << "\n\n  ==== Simulation results (performance) ====\n";
-    cout << "  1. average access time:" << setw(15) << " \n";
+    cout << "  e. L1 miss rate:" << setw(22) << fixed << setprecision(4) << (missReads + missWrites) / (double)(totalReads + totalWrites) << endl;
+    cout << "  f. number of writebacks from L1:" << setw(6) << writeBacks << endl;
+    if (parameters->L1_WRITE_POLICY) {
+        cout << "  g. total memory traffic:" << setw(14) << missReads + totalWrites << endl;
+	} else if (!parameters->L1_WRITE_POLICY) {
+		cout << "  g. total memory traffic:" << setw(14) << missReads + missWrites + writeBacks << endl;
+	}
+
+    // Average Access Time = Hit L1 + L1 Miss Rate * MissPenalty L1 
+	// Hit L1 (ns) =  0.25 + 2.5 * (L1 CacheSize / 512KB) + 0.025 * (L1 BlockSize / 16B) + 0.025 * assoc;
+	double L1Hit = 0.25 + 2.5 * (parameters->L1_SIZE / (512.0 * 1024)) + 0.025 * (parameters->L1_BLOCKSIZE / 16.0) + 0.025 * parameters->L1_ASSOC;
+	double L1MissRate = (missReads + missWrites) / (float)(totalReads + totalWrites);
+	double L1MissPenalty = 20 + 0.5 * (parameters->L1_BLOCKSIZE / 16.0);
+	cout << "\n  ==== Simulation results (performance) ====\n";
+    cout << "  1. average access time:" << setw(15) << L1Hit + L1MissRate * L1MissPenalty << " ns\n";
+
 }
 
 
