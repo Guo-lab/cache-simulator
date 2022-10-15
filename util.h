@@ -20,7 +20,7 @@ struct Param {
 };
 
 void get_input(int argc, char *argv[], struct Param* parameters);
-void parse_trace(struct Param* parameters);
+void parse_trace_and_run(struct Param* parameters);
 
 typedef struct {
     bool valid_bit, dirty_bit;

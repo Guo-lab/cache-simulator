@@ -30,7 +30,7 @@ void get_input(int argc, char *argv[], struct Param* parameters) {
 }
 
 
-void parse_trace(struct Param* parameters) {
+void parse_trace_and_run(struct Param* parameters) {
 	string path = "../traces/";
 	//cout << typeid(path).name() <<endl;
 	//cout << typeid(parameters->trace_file).name() << endl;
@@ -87,7 +87,7 @@ void parse_trace(struct Param* parameters) {
 	// When I try to give_output(struct Param* parameters, class Cache CacheL1);
 	// Got free(): double free detected in tcache 2
     //     Aborted (core dumped)
-	give_output(parameters, CacheL1.totalReads, \ 
+	give_output(parameters, CacheL1.totalReads, \
 	    CacheL1.totalWrites, \
 		CacheL1.missReads, \
 		CacheL1.missWrites, \
@@ -143,12 +143,6 @@ void give_output(struct Param* parameters, int totalReads, int totalWrites, int 
 
 
 
-
-
-
-
-
-
 /* For class Cache functions */
 /* replace 0: LRU  replace 1: LFU */
 /* write 0  : WBWA write   1: WTNA*/
@@ -174,7 +168,7 @@ Cache::Cache(int _cachesize, int _assoc, int _blocksize, int _replace, int _writ
 			cache_sets[i][j].valid_bit = 0;
 			cache_sets[i][j].dirty_bit = 0;
 			cache_sets[i][j].tag = -1;
-			cache_sets[i][j].COUNT_BLOCK = 0;
+			cache_sets[i][j].COUNT_BLOCK = -1;
 		}
 	}
     COUNT_SET = (unsigned int*)malloc(sizeof(unsigned int) * setnum);
@@ -193,14 +187,22 @@ Cache::~Cache(void) {
 }
 
 
-
-
 bool Cache::readFromAddress(unsigned int index, unsigned int tag) {
     totalReads++;
 	// max index = 256
     for ( int i=0; i < assoc; i++) {
         // valid and tag exists
 		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag==tag) {
+			// time (13) LRU Least Recently Used, Age Update
+            if (replace == 0) {
+				for (int others=0; others < assoc; others++) {
+					if( cache_sets[index][others].valid_bit && 
+					    cache_sets[index][others].COUNT_BLOCK < cache_sets[index][i].COUNT_BLOCK ) {
+							cache_sets[index][others].COUNT_BLOCK++;
+						}
+				}
+			}
+
 			// time (5) LFU Least Frequently Used
 			// Update ages
 			cache_sets[index][i].COUNT_BLOCK = (replace? cache_sets[index][i].COUNT_BLOCK+1 : 0);
@@ -233,7 +235,19 @@ void Cache::replace_block(unsigned int index, unsigned int tag, bool IsW) {
 					min_age = cache_sets[index][i].COUNT_BLOCK;
 				}
 			}
+		} 
+		// time (12) LRU Least Recently Used
+		else if (!replace) {
+            unsigned int max_age = -1; 
+			// cout << int(max_age) << endl;
+			for (int k=0; k < assoc; k++) {
+				if (int(cache_sets[index][k].COUNT_BLOCK) > int(max_age)) {
+                    i = k;
+					max_age = cache_sets[index][i].COUNT_BLOCK;
+				}
+			}
 		}
+
 	}
     
 	// time (10) WBWA has been write, dirty
@@ -252,6 +266,16 @@ void Cache::replace_block(unsigned int index, unsigned int tag, bool IsW) {
 	cache_sets[index][i].tag         = tag;
 	cache_sets[index][i].dirty_bit   = IsW; 
 	cache_sets[index][i].valid_bit   = true;
+
+	// time (11) LRU Least Recently Used
+	// other blocks in a set age++ together
+	if (replace == 0) {
+		for (int ii=0; ii < assoc; ii++) {
+            if (i != ii && int(cache_sets[index][ii].COUNT_BLOCK) != -1) {
+				cache_sets[index][ii].COUNT_BLOCK++;
+			}
+		}
+	}
 }
 
 bool Cache::writeToAddress(unsigned int index, unsigned int tag) {
@@ -259,7 +283,16 @@ bool Cache::writeToAddress(unsigned int index, unsigned int tag) {
     // time (6)
     for (int i=0; i < assoc; i++) {
 		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag==tag) {
-		    // time (7) LFU
+		    // time (13) LRU Least Recently Used, Age Update
+            if (replace == 0) {
+				for (int others=0; others < assoc; others++) {
+					if( cache_sets[index][others].valid_bit && 
+					    cache_sets[index][others].COUNT_BLOCK < cache_sets[index][i].COUNT_BLOCK ) {
+							cache_sets[index][others].COUNT_BLOCK++;
+						}
+				}
+			}
+			// time (7) LFU
 		    cache_sets[index][i].COUNT_BLOCK = (replace? cache_sets[index][i].COUNT_BLOCK+1 : 0);
 		    cache_sets[index][i].dirty_bit   = cache_sets[index][i].dirty_bit | (!write); 
 		    return true;
