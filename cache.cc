@@ -37,11 +37,12 @@ void parse_trace_and_run(struct Param* parameters) {
     if (parameters->L2_SIZE == 0) {
 		CacheL2 = NULL;
 	} else {
-		Cache CacheL2(parameters->L2_SIZE, parameters->L2_ASSOC, parameters->BLOCKSIZE, parameters->trace_file, NULL, 0);
+		CacheL2 = new Cache(parameters->L2_SIZE, parameters->L2_ASSOC, parameters->BLOCKSIZE, parameters->trace_file, NULL, 0);
 	}    
-    Cache CacheL1(parameters->L1_SIZE, parameters->L1_ASSOC, parameters->BLOCKSIZE, parameters->trace_file, CacheL2, parameters->Victim_Cache_SIZE);
-
-    string line;
+    // Cache CacheL1(parameters->L1_SIZE, parameters->L1_ASSOC, parameters->BLOCKSIZE, parameters->trace_file, CacheL2, parameters->Victim_Cache_SIZE);
+    Cache* CacheL1 = new Cache(parameters->L1_SIZE, parameters->L1_ASSOC, parameters->BLOCKSIZE, parameters->trace_file, CacheL2, parameters->Victim_Cache_SIZE);
+    
+	string line;
 	while(getline(f, line)) {
         char r_w;
         unsigned address; 
@@ -51,77 +52,99 @@ void parse_trace_and_run(struct Param* parameters) {
 		separate >> hex >> address; // convert hex address to dec
 		// cout << r_w << " " << address << endl;
     
-		/*// [          32 bit address         ] 
-		// [tag 31 11][index 10 5][offset 4 0]
-        unsigned int tag = address / (blocksize * setnum);
-		// [  address  xor  tag  ][   zero   ]
-        unsigned int index = (address ^ (tag * blocksize * setnum)) / blocksize;
-		*/
-		/*
+	    // Address parser not here, as L1 and L2 Cache are different.
+		
+		bool result;
 		if (r_w == 'r') {
-			result = CacheL1.readFromAddress(index, tag);
+			result = CacheL1->readFromAddress(address);
             if (!result) 
-			    CacheL1.replace_block(index, tag, false);
+			    CacheL1->replace_block(address, false);
 		}
+		
 		else if (r_w == 'w') {
-			result = CacheL1.writeToAddress(index, tag);
-		    // time (9) WTNA no replace no dirty_bit
+			result = CacheL1->writeToAddress(address);
 			if (!result) {
-				if (parameters->L1_WRITE_POLICY)
-				    continue;
-				else if (!parameters->L1_WRITE_POLICY)
-				    CacheL1.replace_block(index, tag, true);
+				CacheL1->replace_block(address, true);
 			}
-		}*/
+		}
 	}
 	f.close();
 
-	//give_output();
+	give_output(parameters, CacheL1);
+
+	CacheL1->~Cache();
+	CacheL2->~Cache();
 }
 
 
-/*void give_output(struct Param* parameters, int totalReads, int totalWrites, int missReads, int missWrites, int writeBacks, Block** cache_sets) {
-	cout << "  ===== Simulator configuration =====\n";
-    cout << "  L1_BLOCKSIZE:" << setw(22) << parameters->L1_BLOCKSIZE << endl;
-    cout << "  L1_SIZE:" << setw(27) << parameters->L1_SIZE << endl;
-    cout << "  L1_ASSOC:" << setw(26) << parameters->L1_ASSOC << endl;
-    cout << "  L1_REPLACEMENT_POLICY:" << setw(13) << parameters->L1_REPLACEMENT_POLICY << endl;
-    cout << "  L1_WRITE_POLICY:" << setw(19) << parameters->L1_WRITE_POLICY << endl;
-    cout << "  trace_file:" << setw(24) << parameters->trace_file << endl;
-    cout << "  ===================================\n\n";
+void give_output(struct Param* parameters, Cache* CacheL1) {
+	cout << setiosflags(ios::left);
+    cout << "===== Simulator configuration =====\n";
+    cout << setw(30) << "BLOCKSIZE:" << parameters->BLOCKSIZE << endl;
+    cout << setw(30) << "L1_SIZE:" << parameters->L1_SIZE << endl;
+    cout << setw(30) << "L1_ASSOC:" << parameters->L1_ASSOC << endl;
+    cout << setw(30) << "Victim_Cache_SIZE:" << parameters->Victim_Cache_SIZE << endl;
+    cout << setw(30) << "L2_SIZE:" << parameters->L2_SIZE << endl;
+    cout << setw(30) << "L2_ASSOC:" << parameters->L2_ASSOC << endl;
+    cout << setw(30) << "trace_file:" << parameters->trace_file << endl;
+    cout << "===================================\n";
 
     cout << "===== L1 contents =====\n";
-	for(int point = 0; point < parameters->L1_SIZE / (parameters->L1_BLOCKSIZE * parameters->L1_ASSOC); point++) {
-        cout << "set" << setw(4) << point << ":";
-        for(int inPoint = 0; inPoint < parameters->L1_ASSOC; inPoint++) {
-            cout << hex << setw(8) << cache_sets[point][inPoint].tag << ' ' << ((!parameters->L1_WRITE_POLICY && cache_sets[point][inPoint].dirty_bit) ? 'D' : ' ');
-		}
-		cout << endl << dec; // later, result dec count
-    }
 
-    cout << "\n  ====== Simulation results (raw) ======\n";
-    cout << "  a. number of L1 reads:" << setw(16) << totalReads << endl;
-	cout << "  b. number of L1 read misses:" << setw(10) << missReads << endl;
-	cout << "  c. number of L1 writes:" << setw(15) << totalWrites << endl;
-    cout << "  d. number of L1 write misses:" << setw(9) << missWrites << endl;
-    cout << "  e. L1 miss rate:" << setw(22) << fixed << setprecision(4) << (missReads + missWrites) / (double)(totalReads + totalWrites) << endl;
-    cout << "  f. number of writebacks from L1:" << setw(6) << writeBacks << endl;
-    if (parameters->L1_WRITE_POLICY) {
-        cout << "  g. total memory traffic:" << setw(14) << missReads + totalWrites << endl;
-	} else if (!parameters->L1_WRITE_POLICY) {
-		cout << "  g. total memory traffic:" << setw(14) << missReads + missWrites + writeBacks << endl;
+	if (parameters->Victim_Cache_SIZE != 0) {
+        cout << "===== Victim Cache contents =====\n";
+
+	}
+	if (parameters->L2_SIZE != 0) {
+	    cout << "===== L2 contents =====\n";	
+
 	}
 
-    // Average Access Time = Hit L1 + L1 Miss Rate * MissPenalty L1 
+    cout << "====== Simulation results (raw) ======\n";
+    cout << setw(38) << "a. number of L1 reads:" << CacheL1->totalReads << endl;
+    cout << setw(38) << "b. number of L1 read misses:" << CacheL1->missReads << endl;
+    cout << setw(38) << "c. number of L1 writes:" << CacheL1->totalWrites << endl;
+    cout << setw(38) << "d. number of L1 write misses:" << CacheL1->missWrites << endl;
+	cout << setw(38) << "e. L1 miss rate:" << fixed << setprecision(4) << (CacheL1->missReads + CacheL1->missWrites) / (double)(CacheL1->totalReads + CacheL1->totalWrites) << endl;
+    cout << setw(38) << "f. number of swaps:" << CacheL1->swap << endl;    
+    cout << setw(38) << "g. number of victim cache writeback:" << CacheL1->writeBacks << endl;
+    cout << setw(38) << "h. number of L2 reads:" << (CacheL1->nextLevel ? CacheL1->nextLevel->totalReads : 0) << endl;
+	if (CacheL1->nextLevel == NULL) {
+        cout << setw(38) << "i. number of L2 read misses:" << 0 << endl;
+        cout << setw(38) << "j. number of L2 writes:" << 0 << endl;
+        cout << setw(38) << "k. number of L2 write misses:" << 0 << endl;
+        cout << setw(38) << "l. L2 miss rate:" << 0 << endl;
+        cout << setw(38) << "m. number of L2 writebacks:" << 0 << endl;		
+	}
+	else {
+        cout << setw(38) << "i. number of L2 read misses:" << CacheL1->nextLevel->missReads << endl;
+        cout << setw(38) << "j. number of L2 writes:" << CacheL1->nextLevel->totalWrites << endl;
+        cout << setw(38) << "k. number of L2 write misses:" << CacheL1->nextLevel->missWrites << endl;
+        cout << setw(38) << "l. L2 miss rate:" << fixed << setprecision(4) << CacheL1->nextLevel->missReads / (double)CacheL1->nextLevel->totalReads << endl;
+        cout << setw(38) << "m. number of L2 writebacks:" << CacheL1->nextLevel->writeBacks << endl;
+	}
+/*    
+	// Average Access Time = Hit L1 + L1 Miss Rate * MissPenalty L1 
 	// Hit L1 (ns) =  0.25 + 2.5 * (L1 CacheSize / 512KB) + 0.025 * (L1 BlockSize / 16B) + 0.025 * assoc;
-	double L1Hit = 0.25 + 2.5 * (parameters->L1_SIZE / (512.0 * 1024)) + 0.025 * (parameters->L1_BLOCKSIZE / 16.0) + 0.025 * parameters->L1_ASSOC;
-	double L1MissRate = (missReads + missWrites) / (float)(totalReads + totalWrites);
-	double L1MissPenalty = 20 + 0.5 * (parameters->L1_BLOCKSIZE / 16.0);
-	cout << "\n  ==== Simulation results (performance) ====\n";
-    cout << "  1. average access time:" << setw(15) << L1Hit + L1MissRate * L1MissPenalty << " ns\n";
-
-}
+	//double L1Hit = 0.25 + 2.5 * (parameters->L1_SIZE / (512.0 * 1024)) + 0.025 * (parameters->L1_BLOCKSIZE / 16.0) + 0.025 * parameters->L1_ASSOC;
+	//double L1MissRate = (missReads + missWrites) / (float)(totalReads + totalWrites);
+	//double L1MissPenalty = 20 + 0.5 * (parameters->L1_BLOCKSIZE / 16.0);
+	//cout << "\n  ==== Simulation results (performance) ====\n";
+    //cout << "  1. average access time:" << setw(15) << L1Hit + L1MissRate * L1MissPenalty << " ns\n";
 */
+    
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -144,6 +167,7 @@ Cache::Cache(int _cachesize, int _assoc, int _blocksize, string _trace_file, Cac
 	missWrites = 0;
 	writeBacks = 0;
 
+    // cout << setnum << endl;
 	cache_sets = (Block**)malloc(sizeof(Block*) * setnum);
 	
 	for (int i = 0; i < setnum; ++i) {
@@ -166,136 +190,336 @@ Cache::Cache(int _cachesize, int _assoc, int _blocksize, string _trace_file, Cac
 
 	swap = 0;
 	nextLevel = _nextLevel;
-	
-	//cout << "Create an object for Cache" << endl; // *2
+	// cout << nextLevel << endl; L2 and then L1
+	// cout << "Create an object for Cache" << endl; // *2
 }
 Cache::~Cache(void) {
-	//cout << cache_sets[0][0].stamp << endl;
 	for (int i = 0; i < setnum; ++i) {
 	    free(cache_sets[i]);
 	}
 	free(cache_sets);
 	free(victim_cache);
+	// cout << "OKK" << endl; 
 }
 
 
 
-/*
-bool Cache::readFromAddress(unsigned int index, unsigned int tag) {
-    totalReads++;
-	// max index = 256
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bool Cache::readFromAddress(unsigned address) {
+    
+	totalReads++;
+	// [          32 bit address         ] 
+	// [tag      ][index     ][offset    ]
+    unsigned int tag = address / (blocksize * setnum);
+	// [  address  xor  tag  ][   zero   ]
+    unsigned int index = (address ^ (tag * blocksize * setnum)) / blocksize;
+
+    // Specifically, for L2, find one valid otherwise replace
     for ( int i=0; i < assoc; i++) {
         // valid and tag exists
-		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag==tag) {
-			// time (13) LRU Least Recently Used, Age Update
-            if (replace == 0) {
-				for (int others=0; others < assoc; others++) {
-					if( cache_sets[index][others].valid_bit && 
-					    cache_sets[index][others].COUNT_BLOCK < cache_sets[index][i].COUNT_BLOCK ) {
-							cache_sets[index][others].COUNT_BLOCK++;
-						}
-				}
+		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag == tag) {
+			// LRU Least Recently Used, Age Update
+            for (int others=0; others < assoc; others++) {
+				if( cache_sets[index][others].valid_bit && 
+				    cache_sets[index][others].COUNT_BLOCK < cache_sets[index][i].COUNT_BLOCK ) {
+						cache_sets[index][others].COUNT_BLOCK++;
+					}
 			}
-
-			// time (5) LFU Least Frequently Used
-			// Update ages
-			cache_sets[index][i].COUNT_BLOCK = (replace? cache_sets[index][i].COUNT_BLOCK+1 : 0);
+			cache_sets[index][i].COUNT_BLOCK = 0;
 			return true;
 		}
 	}
-    // time (0) No before
-	missReads++;
-	return false;
-}
-*/
-/*
-void Cache::replace_block(unsigned int index, unsigned int tag, bool IsW) {
-    // time (1)
-	int i;
-	for ( i=0; i < assoc; i++) {
-		if (cache_sets[index][i].valid_bit == 0) {
-			// fetch one to replace
+ 
+    // No before, Check Victim Block
+	int vic; // NO Victim Cache Victimnum==0
+	for (vic = 0; vic < victimnum; vic++) {
+		// victim cache tag
+		// [tag      ][index     ][offset    ]
+		// [tag                  ][offset    ]
+		if (victim_cache[vic].valid_bit && victim_cache[vic].tag == address / blocksize) {
 			break;
 		}
 	}
-	// time (4) full, replace one
-    if ( i == assoc ) {
-		// LFU
-		if (replace) {
-			unsigned int min_age = 10000;
-			//cout << min_age <<endl;
-			for (int k=0; k < assoc; k++) {
-				if (cache_sets[index][k].COUNT_BLOCK < min_age) {
-					i = k;
-					min_age = cache_sets[index][i].COUNT_BLOCK;
-				}
-			}
-		} 
-		// time (12) LRU Least Recently Used
-		else if (!replace) {
-            unsigned int max_age = -1; 
-			// cout << int(max_age) << endl;
-			for (int k=0; k < assoc; k++) {
-				if (int(cache_sets[index][k].COUNT_BLOCK) > int(max_age)) {
-                    i = k;
-					max_age = cache_sets[index][i].COUNT_BLOCK;
-				}
+	// Hit one in Victim Cache
+	if (vic != victimnum) { // Swap L1 Cache and Victim Cache
+	    swap++;
+
+        Block L_to_swap;  
+		unsigned int max_age = -1;
+		// cache_sets[index][i] is about to be swapped.
+		int i = 0; 
+		for (int k=0; k < assoc; k++) {
+			if (int(cache_sets[index][k].COUNT_BLOCK) > int(max_age)) {
+				i = k;
+				max_age = cache_sets[index][i].COUNT_BLOCK;
 			}
 		}
+		L_to_swap.valid_bit   = cache_sets[index][i].valid_bit;
+		L_to_swap.dirty_bit   = cache_sets[index][i].dirty_bit;
+		L_to_swap.tag         = cache_sets[index][i].tag;
+		L_to_swap.COUNT_BLOCK = cache_sets[index][i].COUNT_BLOCK; 
 
+        // All blocks in victim_cache, COUNT_BLOCK ++ if < hit_block
+		for (int point=0; point < victimnum; point++) {
+			if (victim_cache[point].COUNT_BLOCK < victim_cache[vic].COUNT_BLOCK) {
+                victim_cache[point].COUNT_BLOCK++;
+			}
+		}  
+        // All blocks in Cache_sets, COUNT_BLOCK++
+		for (int point=0; point < setnum; point++) {
+			cache_sets[index][point].COUNT_BLOCK++;
+		}
+        
+		// SWAP: victim_hit_block and L1_swap_block COUNT_BLOCK reset
+        cache_sets[index][i].valid_bit   = true;
+		cache_sets[index][i].dirty_bit   = victim_cache[vic].dirty_bit;
+		cache_sets[index][i].COUNT_BLOCK = 0;
+		cache_sets[index][i].tag         = tag;
+		victim_cache[vic].valid_bit   = true;
+		victim_cache[vic].dirty_bit   = L_to_swap.dirty_bit;
+		victim_cache[vic].tag         = L_to_swap.tag * setnum + index; // bits and tag recovery
+		victim_cache[vic].COUNT_BLOCK = 0; 
+
+		return true;
 	}
+
+	// L1 and Victim Miss
+	missReads++;
+	return false;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/* In replace_function, consider that Read or Write in Next Level CacheL2*/
+void Cache::replace_block(unsigned address, bool IsW) {
     
-	// time (10) WBWA has been write, dirty
-    if (cache_sets[index][i].valid_bit && cache_sets[index][i].dirty_bit) {
-		writeBacks++;
+	unsigned int tag = address / (blocksize * setnum);
+    unsigned int index = (address ^ (tag * blocksize * setnum)) / blocksize;
+
+    // Decide which one to replace
+	int i;
+	for ( i=0; i < assoc; i++) {
+		if (cache_sets[index][i].valid_bit == 0) {
+			// fetch one to Use. 
+			// In Cold Phase
+			break;
+		}
 	}
-
-	// time (2) read miss get one to place 
-	// with LFU, update stamp
-	if (cache_sets[index][i].valid_bit && replace) {
-        COUNT_SET[index] = cache_sets[index][i].COUNT_BLOCK;
-	}
-
-	// time (3) Update NO matter whether replace
-    cache_sets[index][i].COUNT_BLOCK = (replace ? COUNT_SET[index]+1 : 0);
-	cache_sets[index][i].tag         = tag;
-	cache_sets[index][i].dirty_bit   = IsW; 
-	cache_sets[index][i].valid_bit   = true;
-
-	// time (11) LRU Least Recently Used
-	// other blocks in a set age++ together
-	if (replace == 0) {
-		for (int ii=0; ii < assoc; ii++) {
-            if (i != ii && int(cache_sets[index][ii].COUNT_BLOCK) != -1) {
-				cache_sets[index][ii].COUNT_BLOCK++;
+	// Cache full, find one to replace
+    if ( i == assoc ) {
+		// LRU Least Recently Used
+        unsigned int max_age = -1; 
+		for (int k=0; k < assoc; k++) {
+			if (int(cache_sets[index][k].COUNT_BLOCK) > int(max_age)) {
+                i = k;
+				max_age = cache_sets[index][i].COUNT_BLOCK;
 			}
 		}
+	}
+	
+	// Before replacing this block. Preserve
+	Block L_to_replace;
+	L_to_replace.COUNT_BLOCK = cache_sets[index][i].COUNT_BLOCK;
+	L_to_replace.tag         = cache_sets[index][i].tag;
+	L_to_replace.valid_bit   = cache_sets[index][i].valid_bit;
+	L_to_replace.dirty_bit   = cache_sets[index][i].dirty_bit;
+	// Update NO matter
+	cache_sets[index][i].COUNT_BLOCK = 0;
+	cache_sets[index][i].tag         = tag;
+	cache_sets[index][i].valid_bit   = true;
+	cache_sets[index][i].dirty_bit   = IsW;
+
+	for (int others=0; others < assoc; others++) {
+		if (others != i) {
+		    cache_sets[index][others].COUNT_BLOCK++;
+		}
+	}
+
+	if (L_to_replace.valid_bit == 0) {
+		// Just Allocate, No Replace
+		// For L2, do not need to send to next level
+        if (nextLevel) {
+			// nextLevel.function() 
+			// error: request for member ‘replace_block’ in ‘((Cache*)this)->Cache::nextLevel’, which is of non-class type ‘Cache*
+			bool result2 = nextLevel->readFromAddress(address); // Condition2, Before Writing, Read from next level 
+			if (result2 == 0) {
+				nextLevel->replace_block(address, false);
+			}
+		}
+	}
+	// L_to_replace has been used
+	else if (L_to_replace.valid_bit == 1) {
+		// Victim Cache Size == 0
+		// Replace L_to_replace
+		if (victimnum != 0) {
+			// Use Vitim Cache to Replace, Similar to Common Cache
+			int j;
+			for (j=0; j < victimnum; j++) {
+                if (victim_cache[j].valid_bit == 0) {
+					// Just replace this block
+					break;
+				}
+ 			}
+			if (j == victimnum) { // LRU fine max age
+				unsigned int max_age = -1;
+				for (int k=0; k < victimnum; k++) {
+					if (int(victim_cache[k].COUNT_BLOCK) > int(max_age)) {
+						j = k;
+                        max_age = victim_cache[j].COUNT_BLOCK;
+					}
+				}
+			}
+
+			// Preserve victim block to Replace and Swap
+            Block victim_to_replace;
+			victim_to_replace.COUNT_BLOCK = victim_cache[j].COUNT_BLOCK;
+			victim_to_replace.tag         = victim_cache[j].tag;
+			victim_to_replace.valid_bit   = victim_cache[j].valid_bit;
+			victim_to_replace.dirty_bit   = victim_cache[j].dirty_bit;
+            victim_cache[j].COUNT_BLOCK = 0;
+			victim_cache[j].tag         = L_to_replace.tag * setnum + index;
+			victim_cache[j].valid_bit   = true;
+			victim_cache[j].dirty_bit   = L_to_replace.dirty_bit;
+			for (int others=0; others < victimnum; others++) {
+				if (others != j) {
+				    victim_cache[others].COUNT_BLOCK++;
+				}
+			}
+
+            // 如果该LRU块是脏块，则将其写回下一级存储器，然后从下一级存储器读取所需的块
+			if (victim_to_replace.dirty_bit == 1) {
+				writeBacks++;
+				if (nextLevel) {
+					// address recovery
+					bool result = nextLevel->writeToAddress(victim_to_replace.tag * blocksize);
+				    if (result == 0) {
+						nextLevel->replace_block(victim_to_replace.tag * blocksize, true);
+					}
+				}
+			}
+		}
+
+
+		// NO Victim Cache
+		// valid and dirty both 1
+		else if (L_to_replace.dirty_bit == 1) {
+			if (nextLevel) {
+			    bool result = nextLevel->writeToAddress((L_to_replace.tag * setnum + index) * blocksize);
+			    if (result) {
+					nextLevel->replace_block((L_to_replace.tag * setnum + index) * blocksize, true);
+				}
+			}
+			// For L1 Cache, No Victim Cache, then write to L2 and replace L2
+			// For L2 Cache,
+			else {
+                writeBacks++;
+			}
+		}
+		return;
 	}
 }
-*/
-/*
-bool Cache::writeToAddress(unsigned int index, unsigned int tag) {
+
+
+
+
+
+
+
+
+
+
+
+bool Cache::writeToAddress(unsigned address) {
     totalWrites++;
-    // time (6)
-    for (int i=0; i < assoc; i++) {
-		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag==tag) {
-		    // time (13) LRU Least Recently Used, Age Update
-            if (replace == 0) {
-				for (int others=0; others < assoc; others++) {
-					if( cache_sets[index][others].valid_bit && 
-					    cache_sets[index][others].COUNT_BLOCK < cache_sets[index][i].COUNT_BLOCK ) {
-							cache_sets[index][others].COUNT_BLOCK++;
-						}
-				}
+
+    unsigned int tag = address / (blocksize * setnum);
+    unsigned int index = (address ^ (tag * blocksize * setnum)) / blocksize;
+
+    for ( int i=0; i < assoc; i++) {
+        // valid and tag exists
+		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag == tag) {
+			// LRU Age Update
+            for (int others=0; others < assoc; others++) {
+				if( cache_sets[index][others].valid_bit && 
+				    cache_sets[index][others].COUNT_BLOCK < cache_sets[index][i].COUNT_BLOCK ) {
+						cache_sets[index][others].COUNT_BLOCK++;
+					}
 			}
-			// time (7) LFU
-		    cache_sets[index][i].COUNT_BLOCK = (replace? cache_sets[index][i].COUNT_BLOCK+1 : 0);
-		    cache_sets[index][i].dirty_bit   = cache_sets[index][i].dirty_bit | (!write); 
-		    return true;
+			cache_sets[index][i].COUNT_BLOCK = 0;
+			cache_sets[index][i].dirty_bit   = true;
+			return true;
 		}
 	}
-	// time (8)
+
+    // No before, Check Victim Block
+	int vic;
+	for (vic = 0; vic < victimnum; vic++) {
+		if (victim_cache[vic].valid_bit && victim_cache[vic].tag == address / blocksize) {
+			break;
+		}
+	}
+	// Hit one in Victim Cache
+	if (vic != victimnum) { // Swap L1 Cache and Victim Cache
+	    swap++;
+        Block L_to_swap;  
+		unsigned int max_age = -1;
+		// cache_sets[index][i] is about to be swapped.
+		int i = 0; 
+		for (int k=0; k < assoc; k++) {
+			if (int(cache_sets[index][k].COUNT_BLOCK) > int(max_age)) {
+				i = k;
+				max_age = cache_sets[index][i].COUNT_BLOCK;
+			}
+		}
+		L_to_swap.valid_bit   = cache_sets[index][i].valid_bit;
+		L_to_swap.dirty_bit   = cache_sets[index][i].dirty_bit;
+		L_to_swap.tag         = cache_sets[index][i].tag;
+		L_to_swap.COUNT_BLOCK = cache_sets[index][i].COUNT_BLOCK; 
+        // All blocks in victim_cache, COUNT_BLOCK ++ if < hit_block
+		for (int point=0; point < victimnum; point++) {
+			if (victim_cache[point].COUNT_BLOCK < victim_cache[vic].COUNT_BLOCK) {
+                victim_cache[point].COUNT_BLOCK++;
+			}
+		}  
+        // All blocks in Cache_sets, COUNT_BLOCK++
+		for (int point=0; point < setnum; point++) {
+			cache_sets[index][point].COUNT_BLOCK++;
+		}
+		// SWAP: victim_hit_block and L1_swap_block COUNT_BLOCK reset
+        cache_sets[index][i].valid_bit   = true;
+		cache_sets[index][i].dirty_bit   = true;
+		cache_sets[index][i].COUNT_BLOCK = 0;
+		cache_sets[index][i].tag         = tag;
+		victim_cache[vic].valid_bit   = true;
+		victim_cache[vic].dirty_bit   = L_to_swap.dirty_bit;
+		victim_cache[vic].tag         = L_to_swap.tag * setnum + index; // bits and tag recovery
+		victim_cache[vic].COUNT_BLOCK = 0; 
+		return true;
+	}
+
 	missWrites++;
 	return false;
 }
-*/
