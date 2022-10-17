@@ -27,8 +27,6 @@ struct Param {
 void get_input(int argc, char *argv[], struct Param* parameters);
 void parse_trace_and_run(struct Param* parameters);
 
-//void give_output(struct Param* parameters, int totalReads, int totalWrites, int missReads, int missWrites, int writeBacks, Block** cache_sets);
-
 
 
 
@@ -48,8 +46,6 @@ class Cache {
         int cachesize, assoc, blocksize, setnum, victimnum;
         string trace_file;
 
-        Cache* nextLevel; // 指向下一级Cache 的指针
-
     public:
         int totalReads, missReads;
         int totalWrites, missWrites, writeBacks;
@@ -58,17 +54,21 @@ class Cache {
         Block *victim_cache;
         
         int swap;
-
+    
+        Cache* nextLevel; // 指向下一级Cache 的指针
 
 
         Cache(int _cachesize, int _assoc, int _blocksize, string _trace_file, Cache* _nextLevel, int _victimsize);
         ~Cache();
 
-        bool readFromAddress(unsigned int index, unsigned int tag);
-        bool writeToAddress(unsigned int index, unsigned int tag);
+        bool readFromAddress(unsigned address);
+        bool writeToAddress(unsigned address);
 
-        void replace_block(unsigned int index, unsigned int tag, bool IsW);
+        void replace_block(unsigned address, bool IsW);
 };
+
+void give_output(struct Param* parameters, Cache* CacheL1);
+
 
 
 #endif // _CACHE_H
