@@ -258,6 +258,7 @@ Cache::Cache(int _cachesize, int _assoc, int _blocksize, string _trace_file, Cac
 	trace_file = _trace_file;
 	setnum     = cachesize / (blocksize * assoc);
 	victimnum  = _victimsize / blocksize;
+	// cout << victimnum << endl; // Case 6: 0, 0
 	totalReads = 0;
 	missReads  = 0;
 	totalWrites= 0;
@@ -326,7 +327,7 @@ bool Cache::readFromAddress(unsigned address) {
 		}
 	}
     // No before, Check Victim Block
-	int vic; // NO Victim Cache Victimnum==0
+	int vic; // NO Victim Cache Victimnum==0 // cout << victimnum << endl; // 0 
 	for (vic = 0; vic < victimnum; vic++) {
 		// victim cache tag
 		// [tag      ][index     ][offset    ]
@@ -411,6 +412,7 @@ void Cache::replace_block(unsigned address, bool IsW) {
 	L_to_replace.tag         = cache_sets[index][i].tag;
 	L_to_replace.valid_bit   = cache_sets[index][i].valid_bit;
 	L_to_replace.dirty_bit   = cache_sets[index][i].dirty_bit;
+	// cout << L_to_replace.valid_bit << endl;
 	// Update NO matter
 	cache_sets[index][i].COUNT_BLOCK = 0;
 	cache_sets[index][i].tag         = tag;
@@ -491,19 +493,30 @@ void Cache::replace_block(unsigned address, bool IsW) {
 		// valid and dirty both 1
 		else if (L_to_replace.dirty_bit == 1) { 
 			// cout << "Breakpoint 4" << endl;
-			if (nextLevel) {
+			if (nextLevel != NULL) {
 			    bool result = nextLevel->writeToAddress((L_to_replace.tag * setnum + index) * blocksize);
-			    if (result) {
+			    if (result == 0) {
 					nextLevel->replace_block((L_to_replace.tag * setnum + index) * blocksize, true);
 				}
 			}
 			// For L1 Cache, No Victim Cache, then write to L2 and replace L2
 			// For L2 Cache,
 			else {
+				// cout << "Cache L2 here writebacks++" << endl;
                 writeBacks++;
 			}
 		}
-	}
+		// Even after Writing, read L2 Cache
+		if (nextLevel != NULL) {
+			// cout << "Breakpoint 2" << endl;
+			// nextLevel.function() 
+			// error: request for member ‘replace_block’ in ‘((Cache*)this)->Cache::nextLevel’, which is of non-class type ‘Cache*
+			bool result2 = nextLevel->readFromAddress(address); // Condition2, Before Writing, Read from next level 
+			if (result2 == 0) {
+				nextLevel->replace_block(address, false);
+			}
+		}
+	} // Read L2 parts can be merged into one at last, Read L2 No matter L1_to_replace valid or not
 	// ELSE IF END
 }
 
