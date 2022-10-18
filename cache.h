@@ -32,7 +32,7 @@ void parse_trace_and_run(struct Param* parameters);
 
 typedef struct {
     bool valid_bit, dirty_bit;
-    unsigned int tag, COUNT_BLOCK;
+    unsigned tag, COUNT_BLOCK;
 } Block;
 
 
@@ -42,11 +42,10 @@ typedef struct {
 // and WBWA write-back + write-allocate
 class Cache {
     private:
-
-        int cachesize, assoc, blocksize, setnum, victimnum;
         string trace_file;
 
     public:
+        int cachesize, assoc, blocksize, setnum, victimnum;
         int totalReads, missReads;
         int totalWrites, missWrites, writeBacks;
         

@@ -36,6 +36,7 @@ void parse_trace_and_run(struct Param* parameters) {
     Cache* CacheL2;
     if (parameters->L2_SIZE == 0) {
 		CacheL2 = NULL;
+		// cout << "Case 8make: No CacheL2" << endl;
 	} else {
 		CacheL2 = new Cache(parameters->L2_SIZE, parameters->L2_ASSOC, parameters->BLOCKSIZE, parameters->trace_file, NULL, 0);
 	}    
@@ -57,10 +58,10 @@ void parse_trace_and_run(struct Param* parameters) {
 		bool result;
 		if (r_w == 'r') {
 			result = CacheL1->readFromAddress(address);
-            if (!result) 
+            if (!result) {
 			    CacheL1->replace_block(address, false);
+			}
 		}
-		
 		else if (r_w == 'w') {
 			result = CacheL1->writeToAddress(address);
 			if (!result) {
@@ -73,7 +74,9 @@ void parse_trace_and_run(struct Param* parameters) {
 	give_output(parameters, CacheL1);
 
 	CacheL1->~Cache();
-	CacheL2->~Cache();
+	if (CacheL2 != NULL) {
+	    CacheL2->~Cache();
+	}
 }
 
 
@@ -90,14 +93,103 @@ void give_output(struct Param* parameters, Cache* CacheL1) {
     cout << "===================================\n";
 
     cout << "===== L1 contents =====\n";
+    for (int scan=0; scan < CacheL1->setnum; scan++) {
+        cout << "set " << scan << ": ";
+		int ii, jj, min;
+		Block temp;
+		for (ii=0; ii < CacheL1->assoc - 1; ii++) {
+            min = ii;
+			for (jj = ii+1; jj < CacheL1->assoc; jj++) {
+				if (CacheL1->cache_sets[scan][jj].COUNT_BLOCK < CacheL1->cache_sets[scan][min].COUNT_BLOCK) {
+					min = jj;
+				}
+			}
+			if (min != ii) {
+				temp.COUNT_BLOCK = CacheL1->cache_sets[scan][min].COUNT_BLOCK;
+				temp.tag         = CacheL1->cache_sets[scan][min].tag;
+				temp.valid_bit   = CacheL1->cache_sets[scan][min].valid_bit;
+				temp.dirty_bit   = CacheL1->cache_sets[scan][min].dirty_bit;
+				CacheL1->cache_sets[scan][min].COUNT_BLOCK = CacheL1->cache_sets[scan][ii].COUNT_BLOCK;
+				CacheL1->cache_sets[scan][min].tag         = CacheL1->cache_sets[scan][ii].tag;
+				CacheL1->cache_sets[scan][min].valid_bit   = CacheL1->cache_sets[scan][ii].valid_bit;
+				CacheL1->cache_sets[scan][min].dirty_bit   = CacheL1->cache_sets[scan][ii].dirty_bit;
+				CacheL1->cache_sets[scan][ii].COUNT_BLOCK = temp.COUNT_BLOCK;
+				CacheL1->cache_sets[scan][ii].tag         = temp.tag;
+				CacheL1->cache_sets[scan][ii].valid_bit   = temp.valid_bit;
+				CacheL1->cache_sets[scan][ii].dirty_bit   = temp.dirty_bit;
+			}
+		}
+		for (int inScan = 0; inScan < CacheL1->assoc; inScan++) {
+            cout << hex << CacheL1->cache_sets[scan][inScan].tag << (CacheL1->cache_sets[scan][inScan].dirty_bit ? " D  " : "    ");
+		}
+        cout << endl << dec;
+	}
 
 	if (parameters->Victim_Cache_SIZE != 0) {
         cout << "===== Victim Cache contents =====\n";
-
+        cout << "set " << 0 << ": ";
+		int ii, jj, min;
+		Block temp;
+	    for (ii=0; ii < CacheL1->victimnum - 1; ii++) {
+            min = ii;
+			for (jj = ii+1; jj < CacheL1->victimnum; jj++) {
+	    	    if (CacheL1->victim_cache[jj].COUNT_BLOCK < CacheL1->victim_cache[min].COUNT_BLOCK) {
+		    	    min = jj;
+			    }
+		    }
+			if (min != ii) {
+		    	temp.COUNT_BLOCK = CacheL1->victim_cache[min].COUNT_BLOCK;
+		    	temp.tag         = CacheL1->victim_cache[min].tag;
+		    	temp.valid_bit   = CacheL1->victim_cache[min].valid_bit;
+		    	temp.dirty_bit   = CacheL1->victim_cache[min].dirty_bit;
+		    	CacheL1->victim_cache[min].COUNT_BLOCK = CacheL1->victim_cache[ii].COUNT_BLOCK;
+		    	CacheL1->victim_cache[min].tag         = CacheL1->victim_cache[ii].tag;
+		    	CacheL1->victim_cache[min].valid_bit   = CacheL1->victim_cache[ii].valid_bit;
+		    	CacheL1->victim_cache[min].dirty_bit   = CacheL1->victim_cache[ii].dirty_bit;
+		    	CacheL1->victim_cache[ii].COUNT_BLOCK = temp.COUNT_BLOCK;
+		    	CacheL1->victim_cache[ii].tag         = temp.tag;
+		    	CacheL1->victim_cache[ii].valid_bit   = temp.valid_bit;
+		    	CacheL1->victim_cache[ii].dirty_bit   = temp.dirty_bit;
+		    }
+		}
+		for (int inScan = 0; inScan < CacheL1->victimnum; inScan++) {
+            cout << hex << CacheL1->victim_cache[inScan].tag << (CacheL1->victim_cache[inScan].dirty_bit ? " D  " : "    ");
+	    }
+        cout << endl << dec;
 	}
 	if (parameters->L2_SIZE != 0) {
 	    cout << "===== L2 contents =====\n";	
-
+        for (int scan=0; scan < CacheL1->nextLevel->setnum; scan++) {
+            cout << "set " << scan << ": ";
+		    int ii, jj, min;
+		    Block temp;
+		    for (ii=0; ii < CacheL1->nextLevel->assoc - 1; ii++) {
+                min = ii;
+		    	for (jj = ii+1; jj < CacheL1->nextLevel->assoc; jj++) {
+		    		if (CacheL1->nextLevel->cache_sets[scan][jj].COUNT_BLOCK < CacheL1->nextLevel->cache_sets[scan][min].COUNT_BLOCK) {
+		    			min = jj;
+		    		}
+		    	}
+		    	if (min != ii) {
+		    		temp.COUNT_BLOCK = CacheL1->nextLevel->cache_sets[scan][min].COUNT_BLOCK;
+		    		temp.tag         = CacheL1->nextLevel->cache_sets[scan][min].tag;
+		    		temp.valid_bit   = CacheL1->nextLevel->cache_sets[scan][min].valid_bit;
+		    		temp.dirty_bit   = CacheL1->nextLevel->cache_sets[scan][min].dirty_bit;
+		    		CacheL1->nextLevel->cache_sets[scan][min].COUNT_BLOCK = CacheL1->nextLevel->cache_sets[scan][ii].COUNT_BLOCK;
+		    		CacheL1->nextLevel->cache_sets[scan][min].tag         = CacheL1->nextLevel->cache_sets[scan][ii].tag;
+		    		CacheL1->nextLevel->cache_sets[scan][min].valid_bit   = CacheL1->nextLevel->cache_sets[scan][ii].valid_bit;
+		    		CacheL1->nextLevel->cache_sets[scan][min].dirty_bit   = CacheL1->nextLevel->cache_sets[scan][ii].dirty_bit;
+		    		CacheL1->nextLevel->cache_sets[scan][ii].COUNT_BLOCK = temp.COUNT_BLOCK;
+		    		CacheL1->nextLevel->cache_sets[scan][ii].tag         = temp.tag;
+		    		CacheL1->nextLevel->cache_sets[scan][ii].valid_bit   = temp.valid_bit;
+		    		CacheL1->nextLevel->cache_sets[scan][ii].dirty_bit   = temp.dirty_bit;
+		    	}
+		    }
+		    for (int inScan = 0; inScan < CacheL1->nextLevel->assoc; inScan++) {
+                cout << hex << CacheL1->nextLevel->cache_sets[scan][inScan].tag << (CacheL1->nextLevel->cache_sets[scan][inScan].dirty_bit ? " D  " : "    ");
+		    }
+            cout << endl << dec;
+	    }
 	}
 
     cout << "====== Simulation results (raw) ======\n";
@@ -115,6 +207,7 @@ void give_output(struct Param* parameters, Cache* CacheL1) {
         cout << setw(38) << "k. number of L2 write misses:" << 0 << endl;
         cout << setw(38) << "l. L2 miss rate:" << 0 << endl;
         cout << setw(38) << "m. number of L2 writebacks:" << 0 << endl;		
+        cout << setw(38) << "n. total memory traffic:" << CacheL1->missReads + CacheL1->missWrites + CacheL1->writeBacks << endl;
 	}
 	else {
         cout << setw(38) << "i. number of L2 read misses:" << CacheL1->nextLevel->missReads << endl;
@@ -122,26 +215,30 @@ void give_output(struct Param* parameters, Cache* CacheL1) {
         cout << setw(38) << "k. number of L2 write misses:" << CacheL1->nextLevel->missWrites << endl;
         cout << setw(38) << "l. L2 miss rate:" << fixed << setprecision(4) << CacheL1->nextLevel->missReads / (double)CacheL1->nextLevel->totalReads << endl;
         cout << setw(38) << "m. number of L2 writebacks:" << CacheL1->nextLevel->writeBacks << endl;
+        cout << setw(38) << "n. total memory traffic:" << CacheL1->nextLevel->missReads + CacheL1->nextLevel->missWrites + CacheL1->nextLevel->writeBacks << endl;
 	}
-/*    
-	// Average Access Time = Hit L1 + L1 Miss Rate * MissPenalty L1 
+
+	// Average Access Time = Hit L1 + L1 Miss Rate * (Hit L2 + L2 Miss Rate * MissPenalty L2) 
 	// Hit L1 (ns) =  0.25 + 2.5 * (L1 CacheSize / 512KB) + 0.025 * (L1 BlockSize / 16B) + 0.025 * assoc;
-	//double L1Hit = 0.25 + 2.5 * (parameters->L1_SIZE / (512.0 * 1024)) + 0.025 * (parameters->L1_BLOCKSIZE / 16.0) + 0.025 * parameters->L1_ASSOC;
-	//double L1MissRate = (missReads + missWrites) / (float)(totalReads + totalWrites);
-	//double L1MissPenalty = 20 + 0.5 * (parameters->L1_BLOCKSIZE / 16.0);
-	//cout << "\n  ==== Simulation results (performance) ====\n";
-    //cout << "  1. average access time:" << setw(15) << L1Hit + L1MissRate * L1MissPenalty << " ns\n";
-*/
-    
+	double L1Hit = 0.25 + 2.5 * (parameters->L1_SIZE / (512.0 * 1024)) + 0.025 * (parameters->BLOCKSIZE / 16.0) + 0.025 * parameters->L1_ASSOC;
+	double L1MissRate = (CacheL1->missReads + CacheL1->missWrites) / (double)(CacheL1->totalReads + CacheL1->totalWrites);
+	double L2Hit, L2MissRate;
+	if (CacheL1->nextLevel == NULL) {
+        L2Hit      = 0;
+		L2MissRate = 0;
+	} else {
+	    L2Hit      = 2.5 + 2.5 * (parameters->L2_SIZE / (512.0 * 1024)) + 0.025 * (parameters->BLOCKSIZE / 16.0) + 0.025 * parameters->L2_ASSOC;
+	    L2MissRate = CacheL1->nextLevel->missReads / (double)CacheL1->nextLevel->totalReads;
+	}
+	double L2MissPenalty = 20 + 0.5 * (parameters->BLOCKSIZE / 16.0);
+    cout << "==== Simulation results (performance) ====" << endl;
+    if (CacheL1->nextLevel == NULL) {
+	    cout << setw(32) << "1. average access time:" << setprecision(4) << L1Hit + (L1MissRate * L2MissPenalty) << " ns" << endl;	
+	} else {
+	    cout << setw(32) << "1. average access time:" << setprecision(4) << L1Hit + (L1MissRate * (L2Hit + L2MissRate * L2MissPenalty)) << " ns" << endl;
+	}
+
 }
-
-
-
-
-
-
-
-
 
 
 
@@ -185,13 +282,13 @@ Cache::Cache(int _cachesize, int _assoc, int _blocksize, string _trace_file, Cac
 		victim_cache[i].valid_bit   = 0;
 		victim_cache[i].dirty_bit   = 0;
 		victim_cache[i].tag         = -1;
-		victim_cache[i].COUNT_BLOCK = -1;
+		victim_cache[i].COUNT_BLOCK = 0;
 	}
 
 	swap = 0;
 	nextLevel = _nextLevel;
-	// cout << nextLevel << endl; L2 and then L1
-	// cout << "Create an object for Cache" << endl; // *2
+	// cout << nextLevel << endl; // L2 and then L1
+	// cout << "Create an object for Cache" << endl; // * 2
 }
 Cache::~Cache(void) {
 	for (int i = 0; i < setnum; ++i) {
@@ -204,46 +301,30 @@ Cache::~Cache(void) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 bool Cache::readFromAddress(unsigned address) {
-    
 	totalReads++;
 	// [          32 bit address         ] 
 	// [tag      ][index     ][offset    ]
-    unsigned int tag = address / (blocksize * setnum);
+    unsigned tag = address / (blocksize * setnum);
 	// [  address  xor  tag  ][   zero   ]
-    unsigned int index = (address ^ (tag * blocksize * setnum)) / blocksize;
-
+    unsigned index = (address ^ (tag * blocksize * setnum)) / blocksize;
+    // cout << setnum << " " << blocksize << endl; // Case 8: 4 and 32
     // Specifically, for L2, find one valid otherwise replace
-    for ( int i=0; i < assoc; i++) {
+    for ( int way = 0; way < assoc; way++) {
         // valid and tag exists
-		if (cache_sets[index][i].valid_bit && cache_sets[index][i].tag == tag) {
+		if (cache_sets[index][way].valid_bit && cache_sets[index][way].tag == tag) {
 			// LRU Least Recently Used, Age Update
             for (int others=0; others < assoc; others++) {
 				if( cache_sets[index][others].valid_bit && 
-				    cache_sets[index][others].COUNT_BLOCK < cache_sets[index][i].COUNT_BLOCK ) {
+				    cache_sets[index][others].COUNT_BLOCK < cache_sets[index][way].COUNT_BLOCK) {
 						cache_sets[index][others].COUNT_BLOCK++;
 					}
 			}
-			cache_sets[index][i].COUNT_BLOCK = 0;
+			cache_sets[index][way].COUNT_BLOCK = 0;
+			cache_sets[index][way].dirty_bit   = cache_sets[index][way].dirty_bit;
 			return true;
 		}
 	}
- 
     // No before, Check Victim Block
 	int vic; // NO Victim Cache Victimnum==0
 	for (vic = 0; vic < victimnum; vic++) {
@@ -257,9 +338,8 @@ bool Cache::readFromAddress(unsigned address) {
 	// Hit one in Victim Cache
 	if (vic != victimnum) { // Swap L1 Cache and Victim Cache
 	    swap++;
-
         Block L_to_swap;  
-		unsigned int max_age = -1;
+		unsigned max_age = -1;
 		// cache_sets[index][i] is about to be swapped.
 		int i = 0; 
 		for (int k=0; k < assoc; k++) {
@@ -272,18 +352,16 @@ bool Cache::readFromAddress(unsigned address) {
 		L_to_swap.dirty_bit   = cache_sets[index][i].dirty_bit;
 		L_to_swap.tag         = cache_sets[index][i].tag;
 		L_to_swap.COUNT_BLOCK = cache_sets[index][i].COUNT_BLOCK; 
-
         // All blocks in victim_cache, COUNT_BLOCK ++ if < hit_block
-		for (int point=0; point < victimnum; point++) {
+		for (int point = 0; point < victimnum; point++) {
 			if (victim_cache[point].COUNT_BLOCK < victim_cache[vic].COUNT_BLOCK) {
                 victim_cache[point].COUNT_BLOCK++;
 			}
 		}  
         // All blocks in Cache_sets, COUNT_BLOCK++
-		for (int point=0; point < setnum; point++) {
+		for (int point = 0; point < assoc; point++) {
 			cache_sets[index][point].COUNT_BLOCK++;
 		}
-        
 		// SWAP: victim_hit_block and L1_swap_block COUNT_BLOCK reset
         cache_sets[index][i].valid_bit   = true;
 		cache_sets[index][i].dirty_bit   = victim_cache[vic].dirty_bit;
@@ -291,12 +369,10 @@ bool Cache::readFromAddress(unsigned address) {
 		cache_sets[index][i].tag         = tag;
 		victim_cache[vic].valid_bit   = true;
 		victim_cache[vic].dirty_bit   = L_to_swap.dirty_bit;
-		victim_cache[vic].tag         = L_to_swap.tag * setnum + index; // bits and tag recovery
+		victim_cache[vic].tag         = L_to_swap.tag * (unsigned)setnum + index; // bits and tag recovery
 		victim_cache[vic].COUNT_BLOCK = 0; 
-
 		return true;
 	}
-
 	// L1 and Victim Miss
 	missReads++;
 	return false;
@@ -306,40 +382,29 @@ bool Cache::readFromAddress(unsigned address) {
 
 
 
-
-
-
-
-
-
-
 /* In replace_function, consider that Read or Write in Next Level CacheL2*/
 void Cache::replace_block(unsigned address, bool IsW) {
-    
-	unsigned int tag = address / (blocksize * setnum);
-    unsigned int index = (address ^ (tag * blocksize * setnum)) / blocksize;
-
+	unsigned tag = address / (blocksize * setnum);
+    unsigned index = (address ^ (tag * blocksize * setnum)) / blocksize;
     // Decide which one to replace
 	int i;
-	for ( i=0; i < assoc; i++) {
+	for (i = 0; i < assoc; i++) {
 		if (cache_sets[index][i].valid_bit == 0) {
-			// fetch one to Use. 
-			// In Cold Phase
+			// fetch one to Use. In Cold Phase
 			break;
 		}
 	}
 	// Cache full, find one to replace
     if ( i == assoc ) {
 		// LRU Least Recently Used
-        unsigned int max_age = -1; 
-		for (int k=0; k < assoc; k++) {
+        unsigned max_age = -1; 
+		for (int k = 0; k < assoc; k++) {
 			if (int(cache_sets[index][k].COUNT_BLOCK) > int(max_age)) {
                 i = k;
 				max_age = cache_sets[index][i].COUNT_BLOCK;
 			}
 		}
 	}
-	
 	// Before replacing this block. Preserve
 	Block L_to_replace;
 	L_to_replace.COUNT_BLOCK = cache_sets[index][i].COUNT_BLOCK;
@@ -351,17 +416,19 @@ void Cache::replace_block(unsigned address, bool IsW) {
 	cache_sets[index][i].tag         = tag;
 	cache_sets[index][i].valid_bit   = true;
 	cache_sets[index][i].dirty_bit   = IsW;
-
+    // Update age
 	for (int others=0; others < assoc; others++) {
 		if (others != i) {
 		    cache_sets[index][others].COUNT_BLOCK++;
 		}
 	}
-
+	// cout << "Breakpoint 1" << endl;
+    // ONLY IF there is Level 2, Read
 	if (L_to_replace.valid_bit == 0) {
 		// Just Allocate, No Replace
 		// For L2, do not need to send to next level
-        if (nextLevel) {
+        if (nextLevel != NULL) {
+			// cout << "Breakpoint 2" << endl;
 			// nextLevel.function() 
 			// error: request for member ‘replace_block’ in ‘((Cache*)this)->Cache::nextLevel’, which is of non-class type ‘Cache*
 			bool result2 = nextLevel->readFromAddress(address); // Condition2, Before Writing, Read from next level 
@@ -374,25 +441,25 @@ void Cache::replace_block(unsigned address, bool IsW) {
 	else if (L_to_replace.valid_bit == 1) {
 		// Victim Cache Size == 0
 		// Replace L_to_replace
-		if (victimnum != 0) {
+		if (victimnum != 0) { // There is Victim Cache.
+		// cout << "Breakpoint 3" << endl;
 			// Use Vitim Cache to Replace, Similar to Common Cache
 			int j;
-			for (j=0; j < victimnum; j++) {
+			for (j = 0; j < victimnum; j++) {
                 if (victim_cache[j].valid_bit == 0) {
 					// Just replace this block
 					break;
 				}
  			}
 			if (j == victimnum) { // LRU fine max age
-				unsigned int max_age = -1;
-				for (int k=0; k < victimnum; k++) {
+				unsigned max_age = -1;
+				for (int k = 0; k < victimnum; k++) {
 					if (int(victim_cache[k].COUNT_BLOCK) > int(max_age)) {
 						j = k;
                         max_age = victim_cache[j].COUNT_BLOCK;
 					}
 				}
 			}
-
 			// Preserve victim block to Replace and Swap
             Block victim_to_replace;
 			victim_to_replace.COUNT_BLOCK = victim_cache[j].COUNT_BLOCK;
@@ -400,19 +467,18 @@ void Cache::replace_block(unsigned address, bool IsW) {
 			victim_to_replace.valid_bit   = victim_cache[j].valid_bit;
 			victim_to_replace.dirty_bit   = victim_cache[j].dirty_bit;
             victim_cache[j].COUNT_BLOCK = 0;
-			victim_cache[j].tag         = L_to_replace.tag * setnum + index;
+			victim_cache[j].tag         = L_to_replace.tag * (unsigned)setnum + index;
 			victim_cache[j].valid_bit   = true;
 			victim_cache[j].dirty_bit   = L_to_replace.dirty_bit;
-			for (int others=0; others < victimnum; others++) {
+			for (int others = 0; others < victimnum; others++) {
 				if (others != j) {
 				    victim_cache[others].COUNT_BLOCK++;
 				}
 			}
-
             // 如果该LRU块是脏块，则将其写回下一级存储器，然后从下一级存储器读取所需的块
-			if (victim_to_replace.dirty_bit == 1) {
-				writeBacks++;
-				if (nextLevel) {
+			if (victim_to_replace.dirty_bit == 1) { // Victim writeback
+				writeBacks++; // Case 8 ends.
+				if (nextLevel != NULL) {
 					// address recovery
 					bool result = nextLevel->writeToAddress(victim_to_replace.tag * blocksize);
 				    if (result == 0) {
@@ -420,12 +486,11 @@ void Cache::replace_block(unsigned address, bool IsW) {
 					}
 				}
 			}
-		}
-
-
+		} // Case 8, stop here.
 		// NO Victim Cache
 		// valid and dirty both 1
-		else if (L_to_replace.dirty_bit == 1) {
+		else if (L_to_replace.dirty_bit == 1) { 
+			// cout << "Breakpoint 4" << endl;
 			if (nextLevel) {
 			    bool result = nextLevel->writeToAddress((L_to_replace.tag * setnum + index) * blocksize);
 			    if (result) {
@@ -438,14 +503,9 @@ void Cache::replace_block(unsigned address, bool IsW) {
                 writeBacks++;
 			}
 		}
-		return;
 	}
+	// ELSE IF END
 }
-
-
-
-
-
 
 
 
@@ -455,8 +515,8 @@ void Cache::replace_block(unsigned address, bool IsW) {
 bool Cache::writeToAddress(unsigned address) {
     totalWrites++;
 
-    unsigned int tag = address / (blocksize * setnum);
-    unsigned int index = (address ^ (tag * blocksize * setnum)) / blocksize;
+    unsigned tag = address / (blocksize * setnum);
+    unsigned index = (address ^ (tag * blocksize * setnum)) / blocksize;
 
     for ( int i=0; i < assoc; i++) {
         // valid and tag exists
@@ -485,7 +545,7 @@ bool Cache::writeToAddress(unsigned address) {
 	if (vic != victimnum) { // Swap L1 Cache and Victim Cache
 	    swap++;
         Block L_to_swap;  
-		unsigned int max_age = -1;
+		unsigned max_age = -1;
 		// cache_sets[index][i] is about to be swapped.
 		int i = 0; 
 		for (int k=0; k < assoc; k++) {
@@ -505,7 +565,7 @@ bool Cache::writeToAddress(unsigned address) {
 			}
 		}  
         // All blocks in Cache_sets, COUNT_BLOCK++
-		for (int point=0; point < setnum; point++) {
+		for (int point = 0; point < assoc; point++) {
 			cache_sets[index][point].COUNT_BLOCK++;
 		}
 		// SWAP: victim_hit_block and L1_swap_block COUNT_BLOCK reset
